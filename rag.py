@@ -1,14 +1,10 @@
 from groq import Groq
 import os
-from dotenv import load_dotenv
-
-load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 def okul_asistani_sorgula(soru, vector_db):
-    arama_sorgusu = f"{soru} yönetmelik maddesi şartları ve sınırları"
-    docs = vector_db.similarity_search(arama_sorgusu, k=5)
+    docs = vector_db.similarity_search(soru, k=3)
 
     baglam = "\n\n".join([doc.page_content for doc in docs])
 
@@ -16,16 +12,19 @@ def okul_asistani_sorgula(soru, vector_db):
         messages=[
             {
                 "role": "system",
-                "content": """Sen MEB yönetmeliği uzmanısın.
-Cevabını SADECE verilen bağlama dayandır."""
+                "content": "Cevabını sadece verilen bağlama göre ver."
             },
             {
                 "role": "user",
-                "content": f"Bağlam: {baglam}\n\nSoru: {soru}"
+                "content": f"Bağlam:\n{baglam}\n\nSoru: {soru}"
             }
         ],
         model="openai/gpt-oss-120b",
-        temperature=0
+        temperature=0,
     )
 
-    return chat_completion.choices[0].message.content
+    cevap = chat_completion.choices[0].message.content
+
+    kaynaklar = [doc.page_content[:200] for doc in docs]
+
+    return cevap, kaynaklar
