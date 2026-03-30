@@ -1,3 +1,4 @@
+# app.py
 import streamlit as st
 from groq import Groq
 from langchain_community.vectorstores import Chroma
@@ -121,14 +122,25 @@ Kurallar:
 
     messages.append({"role": "user", "content": f"{baglam}\n\nSoru: {soru}"})
 
-    chat_completion = client.chat.completions.create(
-        messages=messages,
-        model="openai/gpt-oss-120b",
-        temperature=0,
-        max_tokens=500
-    )
+    # 🔒 Groq çağrısını try/except ile güvenli yap
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=messages,
+            model="openai/gpt-oss-120b",
+            temperature=0,
+            max_tokens=500
+        )
 
-    cevap = chat_completion.choices[0].message.content
+        # Güvenli çekme
+        if hasattr(chat_completion.choices[0], "message") and hasattr(chat_completion.choices[0].message, "content"):
+            cevap = chat_completion.choices[0].message.content
+        elif hasattr(chat_completion.choices[0], "text"):
+            cevap = chat_completion.choices[0].text
+        else:
+            cevap = "⚠️ Yanıt alınamadı."
+    except Exception as e:
+        cevap = f"⚠️ API çağrısında hata oluştu: {e}"
+
     cevap = temizle_cevap(cevap)
 
     # 📝 Session state güncelle
