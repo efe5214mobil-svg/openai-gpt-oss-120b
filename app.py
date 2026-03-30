@@ -33,36 +33,53 @@ vector_db = load_vector_db()
 
 # 🤖 SORGULAMA
 def okul_asistani_sorgula(soru):
-    docs = vector_db.similarity_search(soru, k=2)  # 🔥 düşürdük
+    # 🔍 daha iyi arama sorgusu
+    arama_sorgusu = f"{soru} meb yönetmelik maddesi devamsızlık şartları"
+
+    # 🔥 gelişmiş arama
+    docs = vector_db.similarity_search_with_score(arama_sorgusu, k=5)
+
+    # en iyi sonuçları seç
+    docs = sorted(docs, key=lambda x: x[1])[:3]
+    docs = [doc[0] for doc in docs]
 
     if not docs:
-        return "Veritabanında uygun bilgi bulunamadı."
+        return "Veri bulunamadı."
 
-    # 🔥 çok kısalttık (en kritik fix)
-    baglam = "\n\n".join([doc.page_content[:300] for doc in docs])
+    # 🔥 bağlam oluştur (kısaltılmış)
+    baglam = "\n\n".join([doc.page_content[:500] for doc in docs])
 
-    try:
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Sen MEB yönetmeliği uzmanısın. Sadece verilen bağlama göre kısa ve net cevap ver."
-                },
-                {
-                    "role": "user",
-                    "content": f"{baglam}\n\nSoru: {soru}"
-                }
-            ],
-            model="llama-3.1-8b-instant",  # ✅ EN STABİL
-            temperature=0,
-            max_tokens=500
-        )
+    # 🤖 AI çağrısı
+    chat_completion = client.chat.completions.create(
+        messages=[
+            {
+                "role": "system",
+                "content": """
+Sen MEB yönetmeliği uzmanısın.
 
-        return chat_completion.choices[0].message.content
+Kurallar:
+- Sadece verilen bağlama göre cevap ver
+- Eğer madde varsa belirt
+- En yakın bilgiyi kullan
+- "bulunamadı" deme
+"""
+            },
+            {
+                "role": "user",
+                "content": f"{baglam}\n\nSoru: {soru}"
+            }
+        ],
+        model="gemma2-9b-it",
+        temperature=0,
+        max_tokens=500
+    )
 
-    except Exception as e:
-        return f"Hata oluştu: {str(e)}"
+    cevap = chat_completion.choices[0].message.content
 
+    # 📚 kaynak ekleme
+    kaynaklar = [doc.page_content[:200] for doc in docs]
+
+    return cevap + "\n\n📚 Kaynak:\n- " + "\n- ".join(kaynaklar)
 # ✍️ INPUT
 soru = st.text_input("Sorunuzu yazın:")
 
