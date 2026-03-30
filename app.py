@@ -8,8 +8,8 @@ import re
 import base64
 from PIL import Image
 
-# 🎨 Sayfa Ayarları ve Gradyanlı Koyu Tema
-st.set_page_config(page_title="MEB Mevzuat Portalı", layout="wide")
+# 🎨 Sayfa Ayarları ve Tema
+st.set_page_config(page_title="MEB Yönetmelik Asistanı", layout="wide")
 
 st.markdown("""
     <style>
@@ -47,7 +47,7 @@ vector_db = load_vector_db()
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
 
-# --- SIDEBAR & AKILLI SIRALAMA (12->9 ve A->Z) ---
+# --- SIDEBAR & SINIFLAR (12->9 ve A->Z) ---
 st.sidebar.header("📌 Sınıflar")
 dersprogram_klasor = "dersprogram_dosyasi"
 dosya_haritasi = {}
@@ -71,19 +71,20 @@ if os.path.exists(dersprogram_klasor):
 
     sirali_isimler = sorted(dosya_haritasi.keys(), key=sirala_mantigi)
     if sirali_isimler:
-        secilen_sinif = st.sidebar.selectbox("Sınıf Listesi:", sirali_isimler)
+        secilen_sinif = st.sidebar.selectbox("Sınıf Seçin:", sirali_isimler)
         st.sidebar.image(Image.open(dosya_haritasi[secilen_sinif]), use_container_width=True)
 
-# 🛡️ GİZLİ GÜVENLİK (Hocalar için Base64)
+# 🛡️ GİZLİ FİLTRE (Base64 Koruma)
 def uygunsuz_mu(soru):
+    # Küfür, +18 ve alakasız kelimeler şifreli haldedir.
     data_enc = "a3VmdXIsYXJnbyxzaXlhc2V0LGRpbixpcmssaGFrYXJldCxwYXJ0aSxzZXgsc2Vrcyxwb3JubyxjaXBsYWssbWVtZSxnb3Qsc2lrLGFtayxwaXBpLHRhY2l6LG11c3RlaGNlbixnYXksbGV6Yml5ZW4sZmV0aXNsdWssdmFnaW5hLHBlbmlzLGVzY29ydCxuYWJlcixuYXNpbHNpbixzZWxhbSxtYWMsaGF2YSxmZW5lcmJhaGNlLGdhbGF0YXNhcmF5"
     yasakli_liste = base64.b64decode(data_enc).decode('utf-8').split(',')
     s = soru.lower()
     if any(k in s for k in yasakli_liste):
-        return True, "⚠️ **Akademik Uyarı:** Girdiğiniz ifade kurumsal iletişim standartlarına uygun değildir."
+        return True, "⚠️ **Uyarı:** Girdiğiniz ifade okul kurallarına veya mevzuat kapsamına uygun değildir."
     return False, ""
 
-# 🤖 SORGULAMA (Yeni Nesil Mevzuat Uzmanı)
+# 🤖 SORGULAMA (MEB Yönetmelik Uzmanı)
 def okul_asistani_sorgula(soru):
     hata, mesaj = uygunsuz_mu(soru)
     if hata: return mesaj, None
@@ -94,16 +95,16 @@ def okul_asistani_sorgula(soru):
     messages = [
         {
             "role": "system", 
-            "content": """Sen T.C. MEB Mevzuat Uzmanısın. 
-            Cevaplarında ASLA 'Evet' veya 'Hayır' gibi kelimelerle başlama. Doğrudan bilgiye gir.
+            "content": """Sen resmi bir MEB Yönetmelik Asistanısın. 
+            Cevaplarına asla 'Evet' veya 'Hayır' diyerek başlama. Doğrudan döküman verisini paylaş.
             
-            KRİTİK BİLGİ: 
-            - Özürlü devamsızlık süresi EN FAZLA 20 GÜNDÜR. 
-            - Özürsüz devamsızlık 10, toplam devamsızlık ise 30 günü aşamaz.
-            - Bu süreleri aşan öğrenciler, ders puanları ne olursa olsun başarısız sayılır.
-            
-            Üslubun resmi, ciddi ve yardımcı olmalıdır. Madde numarası vererek açıkla. 
-            Eğer soru mevzuat dışıysa kibarca belirt."""
+            ÖNEMLİ KURALLAR:
+            - Özürlü devamsızlık sınırı en fazla 20 GÜNDÜR.
+            - Özürsüz devamsızlık sınırı 10 GÜNDÜR.
+            - Toplam (özürlü+özürsüz) devamsızlık 30 GÜNDÜR. 30.5 olan kalır.
+            - Sınıf geçme barajı 50 ortalamadır.
+            - Sorumlu geçme şartlarını dökümana göre açıkla.
+            - Üslubun ciddi, yardımsever ve tamamen yönetmelik odaklı olmalıdır."""
         }
     ]
     messages.extend(st.session_state.conversation[-2:])
@@ -118,29 +119,38 @@ def okul_asistani_sorgula(soru):
         )
         return completion.choices[0].message.content, docs
     except:
-        return "Sistem şu an meşgul, lütfen kurumsal çerçevede tekrar deneyiniz.", None
+        return "Şu an yanıt verilemiyor, lütfen sorunuzu yönetmelik çerçevesinde tekrar iletin.", None
 
 # --- ANA EKRAN ---
-st.title("🏛️ MEB Yönetmelik Asistanı")
+st.title("🎓 MEB Yönetmelik Asistanı")
 
-with st.expander("💡 Sıkça Sorulan Sorular"):
-    st.write("- Özürlü devamsızlık hakkı toplam kaç gündür?")
-    st.write("- Sorumlu olarak sınıf geçme şartları nelerdir?")
-    st.write("- Devamsızlık nedeniyle sınıf tekrarı hangi durumlarda yapılır?")
+# 💡 Kapsamlı SSS Bölümü
+with st.expander("❓ Sıkça Sorulan Sorular"):
+    c1, c2 = st.columns(2)
+    with c1:
+        st.markdown("**Devamsızlık Bilgileri**")
+        st.write("- Özürlü devamsızlık sınırı kaç gün?")
+        st.write("- Özürsüz 10 günü geçersem ne olur?")
+        st.write("- Heyet raporu devamsızlığı etkiler mi?")
+    with c2:
+        st.markdown("**Sınıf Geçme ve Disiplin**")
+        st.write("- Kaç zayıf ile sınıfta kalınır?")
+        st.write("- Ortalamam 50 altındaysa sorumlu geçebilir miyim?")
+        st.write("- Okula telefon getirmenin cezası nedir?")
 
 for msg in st.session_state.conversation:
     with st.chat_message(msg["role"]): st.write(msg["content"])
 
-if prompt := st.chat_input("Mevzuat sorunuzu buraya yazın..."):
+if prompt := st.chat_input("Yönetmelik hakkında sorunuzu yazın..."):
     st.session_state.conversation.append({"role": "user", "content": prompt})
     with st.chat_message("user"): st.write(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("Resmi kayıtlar inceleniyor..."):
+        with st.spinner("Mevzuat taranıyor..."):
             cevap, kaynaklar = okul_asistani_sorgula(prompt)
             st.markdown(cevap)
             if kaynaklar:
-                with st.expander("📖 Dayanak Maddeler"):
+                with st.expander("📖 Dayanak Yönetmelik Maddeleri"):
                     for k in kaynaklar: st.caption(k.page_content)
         
         st.session_state.conversation.append({"role": "assistant", "content": cevap})
