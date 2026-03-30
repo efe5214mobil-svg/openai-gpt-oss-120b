@@ -48,7 +48,7 @@ if "conversation" not in st.session_state:
     st.session_state.conversation = []
 
 # --- SIDEBAR & AKILLI SIRALAMA ---
-st.sidebar.header("📌 Kurumsal Birimler")
+st.sidebar.header("📌 Sınıf Programları")
 dersprogram_klasor = "dersprogram_dosyasi"
 dosya_haritasi = {}
 
@@ -118,7 +118,7 @@ def okul_asistani_sorgula(soru):
         return "Sistem şu an meşgul, lütfen kurumsal çerçevede tekrar deneyiniz.", None
 
 # --- ANA EKRAN ---
-st.title("🏛️ MEB Kurumsal Mevzuat Portalı")
+st.title("🏛️ MEB Yönetmelik Asistanı")
 
 # 💡 Hızlı Sorular Bölümü (Kullanıcıya Yol Gösterir)
 with st.expander("💡 Sıkça Sorulan Sorular (Hızlı Seçim)"):
