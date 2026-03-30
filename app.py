@@ -47,8 +47,8 @@ vector_db = load_vector_db()
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
 
-# --- SIDEBAR & AKILLI SIRALAMA ---
-st.sidebar.header("📌 Sınıf Programları")
+# --- SIDEBAR & AKILLI SIRALAMA (12->9 ve A->Z) ---
+st.sidebar.header("📌 Kurumsal Birimler")
 dersprogram_klasor = "dersprogram_dosyasi"
 dosya_haritasi = {}
 
@@ -58,7 +58,9 @@ if os.path.exists(dersprogram_klasor):
         isim_ham = d.lower().replace(".png", "").replace(" ", "").replace("-", "").replace(".", "")
         match = re.search(r"(\d+)([a-z]+)", isim_ham)
         if match:
-            gosterim_adi = f"{match.group(1)} - {match.group(2).upper()}"
+            sayi = match.group(1)
+            harf = match.group(2).upper()
+            gosterim_adi = f"{sayi} - {harf}"
             dosya_haritasi[gosterim_adi] = os.path.join(dersprogram_klasor, d)
 
     def sirala_mantigi(x):
@@ -78,29 +80,30 @@ def uygunsuz_mu(soru):
     yasakli_liste = base64.b64decode(data_enc).decode('utf-8').split(',')
     s = soru.lower()
     if any(k in s for k in yasakli_liste):
-        return True, "⚠️ **Akademik Uyarı:** İfadeniz kurumsal iletişim standartlarına uygun değildir."
+        return True, "⚠️ **Akademik Uyarı:** Girdiğiniz ifade kurumsal iletişim standartlarına uygun değildir."
     return False, ""
 
-# 🤖 SORGULAMA (Uzman Tahminli Model)
+# 🤖 SORGULAMA (Yeni Nesil Mevzuat Uzmanı)
 def okul_asistani_sorgula(soru):
     hata, mesaj = uygunsuz_mu(soru)
     if hata: return mesaj, None
 
-    docs = vector_db.similarity_search(soru, k=5) # K'yı 5 yaptım daha çok veri çeksin
+    docs = vector_db.similarity_search(soru, k=5)
     baglam = "\n\n".join([d.page_content for d in docs])
 
     messages = [
         {
             "role": "system", 
             "content": """Sen T.C. MEB Mevzuat Uzmanısın. 
-            Öğrenciler ve veliler genelde şu konularda endişelidir, cevaplarını bu hassasiyetle ver:
-            1. SINIF GEÇME: Ortalaması 50 altı olanlar, 3 dersten fazla zayıfı olanlar (sorumlu geçme).
-            2. DEVAMSIZLIK: 10 gün özürsüz, 30 gün toplam sınır. 0.5 gün bile aşılsa kalırlar.
-            3. DİSİPLİN: Telefon kullanımı, kılık kıyafet ve kavga cezaları.
-            4. NAKİL: Puan üstünlüğü ve kontenjan durumu.
+            Cevaplarında ASLA 'Evet' veya 'Hayır' gibi kelimelerle başlama. Doğrudan bilgiye gir.
             
-            KURAL: Cevaba net bir EVET veya HAYIR ile başla. Resmi madde numarası varsa belirt. 
-            Eğer soru bu 4 ana konunun çok dışındaysa 'Bu konu mevzuat kapsamı dışındadır' de."""
+            KRİTİK BİLGİ: 
+            - Özürlü devamsızlık süresi EN FAZLA 20 GÜNDÜR. 
+            - Özürsüz devamsızlık 10, toplam devamsızlık ise 30 günü aşamaz.
+            - Bu süreleri aşan öğrenciler, ders puanları ne olursa olsun başarısız sayılır.
+            
+            Üslubun resmi, ciddi ve yardımcı olmalıdır. Madde numarası vererek açıkla. 
+            Eğer soru mevzuat dışıysa kibarca belirt."""
         }
     ]
     messages.extend(st.session_state.conversation[-2:])
@@ -118,25 +121,22 @@ def okul_asistani_sorgula(soru):
         return "Sistem şu an meşgul, lütfen kurumsal çerçevede tekrar deneyiniz.", None
 
 # --- ANA EKRAN ---
-st.title("🏛️ MEB Yönetmelik Asistanı")
+st.title("🏛️ MEB Kurumsal Mevzuat Portalı")
 
-# 💡 Hızlı Sorular Bölümü (Kullanıcıya Yol Gösterir)
-with st.expander("💡 Sıkça Sorulan Sorular (Hızlı Seçim)"):
-    st.write("- Özürsüz devamsızlığım 10.5 gün, sınıfta kalır mıyım?")
-    st.write("- Kaç zayıf ile sorumlu geçerim?")
-    st.write("- Ortalamam 49.5, yuvarlanır mı?")
-    st.write("- Okulda telefon yakalatmanın cezası nedir?")
-    st.write("- Özürlü devamsızlık kaç gün olabilir?")
+with st.expander("💡 Sıkça Sorulan Sorular"):
+    st.write("- Özürlü devamsızlık hakkı toplam kaç gündür?")
+    st.write("- Sorumlu olarak sınıf geçme şartları nelerdir?")
+    st.write("- Devamsızlık nedeniyle sınıf tekrarı hangi durumlarda yapılır?")
 
 for msg in st.session_state.conversation:
     with st.chat_message(msg["role"]): st.write(msg["content"])
 
-if prompt := st.chat_input("Mevzuat sorunuzu yazın..."):
+if prompt := st.chat_input("Mevzuat sorunuzu buraya yazın..."):
     st.session_state.conversation.append({"role": "user", "content": prompt})
     with st.chat_message("user"): st.write(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("Resmi belgeler taranıyor..."):
+        with st.spinner("Resmi kayıtlar inceleniyor..."):
             cevap, kaynaklar = okul_asistani_sorgula(prompt)
             st.markdown(cevap)
             if kaynaklar:
