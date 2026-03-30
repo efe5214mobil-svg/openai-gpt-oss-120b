@@ -27,21 +27,30 @@ st.info("⚠️ Sadece MEB yönetmeliği ile ilgili sorular sorabilirsiniz. Uygu
 st.sidebar.header("📌 Sınıf Ders Programı")
 dersprogram_klasor = "dersprogram_dosyasi"
 
-# Klasördeki tüm PNG dosyalarını tarayıp sınıf isimleri ve dosya yolu eşlemesi oluştur
 siniflar = []
-dosya_dict = {}  # "sınıf" -> "dosya yolu"
+dosya_dict = {}
 
 if os.path.exists(dersprogram_klasor):
     for dosya in os.listdir(dersprogram_klasor):
         if dosya.lower().endswith(".png"):
+            # Dosya adını normalize et
             sinif = dosya.replace(".png", "").upper().replace(" ", "")
             siniflar.append(sinif)
             dosya_dict[sinif] = os.path.join(dersprogram_klasor, dosya)
-    siniflar = sorted(siniflar)
+    
+    # Özel sıralama: önce 12 → 9, sonra A, B, C... 
+    def sinif_sort_key(s):
+        # Örnek: 12A -> (12, 'A')
+        numara = int(''.join(filter(str.isdigit, s)))
+        harf = ''.join(filter(str.isalpha, s)) or ""
+        return (-numara, harf)  # -numara => ters sırala
+    
+    siniflar.sort(key=sinif_sort_key)
+
 else:
     st.sidebar.warning(f"📂 Klasör bulunamadı: {dersprogram_klasor}")
 
-# Sidebar selectbox'ta 9A, 10 gibi gösterimleri "9 - A" gibi yap
+# Selectbox için gösterim: 9A -> 9 - A
 def secim_gosterim_func(s):
     if len(s) == 2:
         return f"{s[0]} - {s[1]}"
