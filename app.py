@@ -7,22 +7,22 @@ import os
 import re
 import pandas as pd
 import camelot
+import matplotlib.pyplot as plt
 
-# 🔐 .env yükle
+# -----------------------------
+# 🔐 API ve Streamlit Başlangıç
+# -----------------------------
 load_dotenv()
-
-# 🔑 API KEY
 api_key = os.getenv("GROQ_API_KEY")
 if not api_key:
     api_key = st.secrets["GROQ_API_KEY"]
-
 client = Groq(api_key=api_key)
 
 st.title("Okul Asistanı - Ders Programı & MEB Yönetmeliği")
 st.info("⚠️ 1) MEB yönetmeliği soruları sorabilirsiniz.\n⚠️ 2) Ders programı için sınıf ismi yazabilirsiniz (örn. 9/B, 9B, 9-B, 10C).")
 
 # -----------------------------
-# MEB Asistanı Fonksiyonları
+# 🧠 VECTOR DB
 # -----------------------------
 @st.cache_resource
 def load_vector_db():
@@ -38,6 +38,9 @@ vector_db = load_vector_db()
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
 
+# -----------------------------
+# MEB Asistanı Fonksiyonları
+# -----------------------------
 def temizle_cevap(cevap):
     cevap = re.sub(r'(\b\d{2,4}\b)(?:/\s*\1)+', r'\1', cevap)
     cevap = re.sub(r'\s{2,}', ' ', cevap)
@@ -103,36 +106,55 @@ Kurallar:
 @st.cache_resource
 def load_pdf_tables(pdf_path):
     tables = camelot.read_pdf(pdf_path, pages='all')
+    if not tables:
+        st.warning("PDF’den tablo okunamadı. Lütfen PDF’i kontrol edin.")
+        return pd.DataFrame()
     df_list = []
     for t in tables:
         df_temp = t.df
-        # Sınıf tahmini regex: tüm harfler A-D için
-        class_row = df_temp[df_temp.apply(lambda row: row.astype(str).str.contains(r'\d{1,2}[/-]?[A-D]').any(), axis=1)]
-        if not class_row.empty:
-            sinif = class_row.iloc[0].astype(str).str.extract(r'(\d{1,2}[/-]?[A-D])')[0].values[0]
-        else:
+        try:
+            class_row = df_temp[df_temp.apply(lambda row: row.astype(str).str.contains(r'\d{1,2}[/-]?[A-D]').any(), axis=1)]
+            if not class_row.empty:
+                sinif = class_row.iloc[0].astype(str).str.extract(r'(\d{1,2}[/-]?[A-D])')[0].values[0]
+            else:
+                sinif = "Bilinmiyor"
+        except Exception:
             sinif = "Bilinmiyor"
         df_temp['Sınıf'] = sinif
         df_list.append(df_temp)
-    df_all = pd.concat(df_list, ignore_index=True)
+    if df_list:
+        df_all = pd.concat(df_list, ignore_index=True)
+    else:
+        df_all = pd.DataFrame()
     return df_all
 
 def normalize_class(s):
     s = s.upper().replace("-", "/").replace(" ", "")
     if "/" not in s and len(s) > 1:
-        s = s[:-1] + "/" + s[-1]  # son harfi ayır
+        s = s[:-1] + "/" + s[-1]
     return s
 
-df_ders = load_pdf_tables("ders_programi.pdf")  # PDF dosya yolu
+pdf_path = "ders_programi.pdf"  # PDF yolu
+df_ders = load_pdf_tables(pdf_path)
 
 def ders_programi_goster(sinif_input):
     sinif = normalize_class(sinif_input)
+    if df_ders.empty or 'Sınıf' not in df_ders.columns:
+        st.warning("PDF’den ders programı okunamadı veya sınıf bilgisi yok.")
+        return
     ders_programi = df_ders[df_ders['Sınıf'].apply(normalize_class) == sinif]
-    if not ders_programi.empty:
-        st.subheader(f"{sinif} Ders Programı ve Öğretmenler")
-        st.table(ders_programi)
-    else:
-        st.warning("Bu sınıf için veri bulunamadı!")
+    if ders_programi.empty:
+        st.warning(f"{sinif} için veri bulunamadı!")
+        return
+
+    # Matplotlib ile görsel tablo oluştur
+    fig, ax = plt.subplots(figsize=(12, len(ders_programi)*0.5 + 2))
+    ax.axis('off')
+    tbl = ax.table(cellText=ders_programi.values, colLabels=ders_programi.columns, loc='center', cellLoc='center')
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(10)
+    tbl.scale(1.2, 1.2)
+    st.pyplot(fig)
 
 # -----------------------------
 # Kullanıcı Girdisi
@@ -140,7 +162,6 @@ def ders_programi_goster(sinif_input):
 user_input = st.text_input("Sorunuzu veya sınıf ismini yazın:")
 
 if user_input:
-    # Sınıf regex: 9A, 10C, 11-D, vb.
     if re.search(r'\d{1,2}[/-]?[A-D]', user_input.upper()):
         ders_programi_goster(user_input)
     else:
