@@ -5,12 +5,11 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from dotenv import load_dotenv
 import os
 
-# 🔐 .env yükle (local için)
+# 🔐 .env yükle
 load_dotenv()
 
-# 🔑 API KEY (önce .env, yoksa Streamlit Secrets)
+# 🔑 API KEY
 api_key = os.getenv("GROQ_API_KEY")
-
 if not api_key:
     api_key = st.secrets["GROQ_API_KEY"]
 
@@ -19,7 +18,7 @@ client = Groq(api_key=api_key)
 # 🎯 Başlık
 st.title("MEB Yönetmelik Asistanı")
 
-# 🧠 VECTOR DB YÜKLE
+# 🧠 VECTOR DB
 @st.cache_resource
 def load_vector_db():
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
@@ -32,36 +31,40 @@ def load_vector_db():
 
 vector_db = load_vector_db()
 
-# 🤖 SORGULAMA FONKSİYONU
+# 🤖 SORGULAMA
 def okul_asistani_sorgula(soru):
-    docs = vector_db.similarity_search(soru, k=3)
+    docs = vector_db.similarity_search(soru, k=2)  # 🔥 düşürdük
 
-    # Eğer veri yoksa
     if not docs:
         return "Veritabanında uygun bilgi bulunamadı."
 
-    # 🔥 baglamı kısalt (çok önemli)
-    baglam = "\n\n".join([doc.page_content[:500] for doc in docs])
+    # 🔥 çok kısalttık (en kritik fix)
+    baglam = "\n\n".join([doc.page_content[:300] for doc in docs])
 
-    chat_completion = client.chat.completions.create(
-        messages=[
-            {
-                "role": "system",
-                "content": "Sen MEB yönetmeliği uzmanısın. Cevabını sadece verilen bağlama göre ver."
-            },
-            {
-                "role": "user",
-                "content": f"Bağlam:\n{baglam}\n\nSoru: {soru}"
-            }
-        ],
-        model="mixtral-8x7b-32768",  # ✅ LLAMA DEĞİL
-        temperature=0,
-    )
+    try:
+        chat_completion = client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Sen MEB yönetmeliği uzmanısın. Sadece verilen bağlama göre kısa ve net cevap ver."
+                },
+                {
+                    "role": "user",
+                    "content": f"{baglam}\n\nSoru: {soru}"
+                }
+            ],
+            model="gemma2-9b-it",  # ✅ EN STABİL
+            temperature=0,
+            max_tokens=500
+        )
 
-    return chat_completion.choices[0].message.content
+        return chat_completion.choices[0].message.content
+
+    except Exception as e:
+        return f"Hata oluştu: {str(e)}"
 
 # ✍️ INPUT
-soru = st.text_input("Sormak istediğiniz konuyu yazın:")
+soru = st.text_input("Sorunuzu yazın:")
 
 if soru:
     with st.spinner("Yanıt hazırlanıyor..."):
