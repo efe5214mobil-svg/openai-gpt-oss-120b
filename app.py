@@ -18,7 +18,7 @@ st.set_page_config(page_title="MEB Mevzuat Asistanı", page_icon="🏛️", layo
 st.markdown("""
 <style>
     .stApp { font-family: 'Inter', sans-serif; }
-    .main-title { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 1.5rem; }
+    .main-title { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 1.5rem; color: #1E1E1E; }
     
     .floating-button-container {
         position: fixed;
@@ -71,7 +71,7 @@ if "conversation" not in st.session_state:
 # 🤖 Sorgulama Fonksiyonu
 def sorgula(soru):
     if filtre_kontrol(soru):
-        return "⚠️ Mesajınız topluluk kurallarına aykırı içerik barındırıyor. Lütfen sadece MEB yönetmeliğiyle ilgili sorular sorun. [TABLO_YOK]", []
+        return "⚠️ Uyarı: Mesajınız topluluk kurallarına aykırı içerik barındırıyor. Siyaset, din veya hakaret içeren sorular yanıtlanmaz. [TABLO_YOK]", []
 
     # Mevzuatı derinden tara
     docs = vector_db.similarity_search(soru, k=5)
@@ -79,13 +79,20 @@ def sorgula(soru):
     
     messages = [{
         "role": "system", 
-        "content": """Sen deneyimli bir MEB mevzuat uzmanısın. 
-        ÖNEMLİ KURALLAR:
-        1. Devamsızlık: Özürsüz (raporsuz) 10 gün, özürlü (raporlu) 20 gün olmak üzere TOPLAM 30 günü aşan öğrenci ders puanları ne olursa olsun sınıf tekrarına kalır.
-        2. Teknik terimlerden (bağlam, pdf verisi vb.) kaçın, doğrudan uzman biri gibi cevap ver.
-        3. Cevabını mutlaka sana sunulan MEVZUAT KAYNAKLARI'na dayandır.
-        4. Soru selamlaşma veya mevzuat dışıysa cevabın sonuna [TABLO_YOK] ekle.
-        5. Eğer dökümanlarda sorunun cevabı yoksa bildiğin MEB kurallarını söyle ama referans tablosu çıkarma ([TABLO_YOK] ekle)."""
+        "content": """Sen uzman bir MEB Mevzuat Asistanısın. Aşağıdaki kuralları hafızana al ve cevaplarını bunlara göre ver:
+
+        1. DEVAMSIZLIK: Özürsüz 10 gün, toplam (özürlü+özürsüz) 30 gün sınırı vardır. Bu sınırları 1 saat bile aşan öğrenci sınıf tekrarına kalır. 60 günlük istisna sadece ağır hastalık/nakil durumlarındadır.
+        2. YAŞ & EVLİLİK: Kayıt için 18 yaş altı olmak gerekir. Evli olanlar kaydedilmez, öğrenciyken evlenenler Açık Lise'ye gönderilir.
+        3. BAŞARI: Ders geçme notu 50'dir. Sorumlu geçme sınırı 3 derstir. Toplam 6 dersten kalan sınıf tekrarı yapar.
+        4. SINAVLAR: Her dersten en az 2 yazılı yapılır. Beceri sınavlarında %80 sınav, %20 iş dosyası etkilidir.
+        5. DİSİPLİN: Kopya çekmek veya tütün (sigara) kullanmak doğrudan "Kınama" cezasıdır.
+        6. ÖDÜLLER: Teşekkür (70.00-84.99), Takdir (85.00+).
+
+        TALİMATLAR:
+        - Cevabını verirken "Sabit veri" veya "Bağlam" gibi kelimeler kullanma.
+        - Eğer soru MEB kurallarıyla ilgiliyse, cevabı ver ve asla [TABLO_YOK] ekleme (Referans tablosu çıksın).
+        - Soru selamlaşma veya okul dışıysa [TABLO_YOK] ekle.
+        - Cevaplarını mutlaka MEVZUAT KAYNAKLARI'ndaki döküman içerikleriyle destekle."""
     }]
     
     for msg in st.session_state.conversation[-4:]:
@@ -107,27 +114,30 @@ st.markdown('<div class="floating-button-container">', unsafe_allow_html=True)
 st.link_button("📅 Sınıf Programı", "https://sinifprogrami.streamlit.app/")
 st.markdown('</div>', unsafe_allow_html=True)
 
-st.markdown("### 💡 Hızlı Öneriler")
+# 💡 Öneri Kartları
+st.markdown("### 💡 Hızlı Sorular")
 c1, c2, c3 = st.columns(3)
 with c1:
-    st.markdown('<div class="category-box"><div class="category-title">📜 Disiplin</div><div class="category-item">• Kopya cezası nedir?<br>• Kınama ne demek?</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="category-box"><div class="category-title">📜 Kayıt & Disiplin</div><div class="category-item">• Evlilik durumu ne olur?<br>• Kopya cezası nedir?</div></div>', unsafe_allow_html=True)
 with c2:
-    st.markdown('<div class="category-box"><div class="category-title">⏳ Devamsızlık</div><div class="category-item">• Kaç gün hakkım var?<br>• 10+20 kuralı nedir?</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="category-box"><div class="category-title">⏳ Devamsızlık</div><div class="category-item">• 30 gün kuralı nedir?<br>• Özürsüz kaç gün?</div></div>', unsafe_allow_html=True)
 with c3:
-    st.markdown('<div class="category-box"><div class="category-title">🎓 Başarı</div><div class="category-item">• Takdir kaç puan?<br>• Kaç zayıfla kalınır?</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="category-box"><div class="category-title">🎓 Başarı & Nakil</div><div class="category-item">• Kaç zayıfla kalınır?<br>• Nakil dönemi ne zaman?</div></div>', unsafe_allow_html=True)
 st.markdown("---")
 
+# Sohbet Akışı
 for msg in st.session_state.conversation:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"].replace("[TABLO_YOK]", ""))
 
+# Giriş
 if prompt := st.chat_input("Yönetmelik hakkında bir soru sorun..."):
     st.session_state.conversation.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("⚖️ Mevzuat dosyaları inceleniyor..."):
+        with st.spinner("⚖️ Mevzuat maddeleri aranıyor..."):
             cevap, kaynaklar = sorgula(prompt)
             
             tablo_gizle = "[TABLO_YOK]" in cevap
@@ -135,9 +145,9 @@ if prompt := st.chat_input("Yönetmelik hakkında bir soru sorun..."):
             
             st.markdown(temiz_cevap)
             
-            # Kaynak maddeler sadece uyuşma varsa görünür
+            # Kaynak maddeler uyuşma varsa görünür
             if kaynaklar and not tablo_gizle:
-                st.markdown("📑 **Soruyla İlgili Mevzuat Maddeleri**")
+                st.markdown("📑 **İlgili Mevzuat Referansları**")
                 ref_data = []
                 for i, doc in enumerate(kaynaklar[:3]):
                     ref_data.append({
