@@ -41,11 +41,6 @@ st.markdown("""
         transition: 0.3s ease !important;
     }
     
-    .stLinkButton a:hover {
-        background-color: #E67E22 !important;
-        transform: scale(1.05);
-    }
-
     .category-box {
         background-color: rgba(128, 128, 128, 0.05);
         border-radius: 15px;
@@ -56,10 +51,7 @@ st.markdown("""
     .category-title { font-weight: bold; color: #FF4B4B; margin-bottom: 10px; font-size: 1.15rem; }
     .category-item { font-size: 0.88rem; margin-bottom: 6px; color: #444; }
     
-    @media (prefers-color-scheme: dark) {
-        .category-item { color: #CCC; }
-        .category-box { background-color: rgba(255, 255, 255, 0.05); }
-    }
+    [data-testid="stChatMessage"] { border-radius: 20px; border: 1px solid rgba(128, 128, 128, 0.15); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -93,7 +85,7 @@ def sorgula(soru):
         - Sınıf Geçme: Max 3 zayıf sorumlu geçer, 6+ zayıf tekrar.
         - Ödül: Teşekkür 70+, Takdir 85+.
         
-        ÖNEMLİ: Eğer soru yönetmelik dışıysa veya çok genel/saçmaysa cevabına mutlaka 'KAPSAM_DISI' kelimesini ekle."""
+        ÖNEMLİ: Eğer soru yönetmelik dışıysa veya saçmaysa cevabına mutlaka 'KAPSAM_DISI' kelimesini ekle."""
     }]
     
     for msg in st.session_state.conversation[-4:]:
@@ -106,24 +98,27 @@ def sorgula(soru):
 # --- ARAYÜZ ---
 st.markdown("<div class='main-title'>🏛️ MEB Mevzuat Uzmanı</div>", unsafe_allow_html=True)
 
+# 🚀 TURUNCU BUTON (YÜZEN)
 st.markdown('<div class="floating-button-container">', unsafe_allow_html=True)
 st.link_button("📅 Sınıf Programı", "https://senin-linkin-buraya.com")
 st.markdown('</div>', unsafe_allow_html=True)
 
-if not st.session_state.conversation:
-    st.markdown("### 💡 Sorabileceğiniz Konular")
+# 💡 ÖNERİ SORULAR (Expander içinde, her zaman erişilebilir)
+with st.expander("🔍 Neler Sorabilirsiniz? (Öneri Sorular)", expanded=not st.session_state.conversation):
     c1, c2, c3 = st.columns(3)
     with c1: st.markdown('<div class="category-box"><div class="category-title">📜 Disiplin</div><div class="category-item">• Kopya cezası?<br>• Sigara yasağı?</div></div>', unsafe_allow_html=True)
     with c2: st.markdown('<div class="category-box"><div class="category-title">⏳ Devamsızlık</div><div class="category-item">• Özürsüz sınır?<br>• 30 gün kuralı?</div></div>', unsafe_allow_html=True)
     with c3: st.markdown('<div class="category-box"><div class="category-title">🎓 Başarı</div><div class="category-item">• Kaç zayıf?<br>• Takdir puanı?</div></div>', unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
 
+st.divider()
+
+# 💬 Sohbet Akışı
 for msg in st.session_state.conversation:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"].replace("KAPSAM_DISI", ""))
 
+# ⌨️ Giriş Alanı
 if prompt := st.chat_input("Sorunuzu buraya yazın..."):
-    # Filtre Kontrolü
     if uygunsuz_mu(prompt):
         uyari = "⚠️ Lütfen topluluk kurallarına uygun ve sadece mevzuatla ilgili sorular sorunuz."
         st.session_state.conversation.append({"role": "user", "content": prompt})
@@ -137,11 +132,8 @@ if prompt := st.chat_input("Sorunuzu buraya yazın..."):
         with st.chat_message("assistant"):
             with st.spinner("⚖️ İnceleniyor..."):
                 raw_cevap, kaynaklar = sorgula(prompt)
-                
-                # Tablo Gizleme Mantığı
                 is_out_of_scope = "KAPSAM_DISI" in raw_cevap
                 clean_cevap = raw_cevap.replace("KAPSAM_DISI", "").strip()
-                
                 st.markdown(clean_cevap)
                 
                 if kaynaklar and not is_out_of_scope:
