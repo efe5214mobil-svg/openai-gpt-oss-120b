@@ -123,9 +123,9 @@ STRATEJİ:
 
     completion = client.chat.completions.create(
         messages=messages,
-        model="openai/gpt-oss-120b",
-        temperature=0.1,
-        max_tokens=600
+        model="gemma2-9b-it",
+        temperature=0.0,
+        max_tokens=800
     )
 
     return completion.choices[0].message.content, docs
