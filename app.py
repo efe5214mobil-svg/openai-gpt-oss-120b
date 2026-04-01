@@ -4,27 +4,31 @@ from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings 
 from dotenv import load_dotenv
 import os
+import re
 
-# 🔐 .env
+# 🔐 API ve Çevre Değişkenleri
 load_dotenv()
 api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 client = Groq(api_key=api_key)
 
-# 🎨 Sayfa
+# 🎨 Sayfa Yapılandırması
 st.set_page_config(page_title="MEB Mevzuat Asistanı", page_icon="🏛️", layout="centered")
 
-# 🎨 Stil
+# 🖌️ Modern CSS (Görsel yapı korunur)
 st.markdown("""
 <style>
-.stApp { font-family: 'Inter', sans-serif; }
-[data-testid="stChatMessage"] {
-    border-radius: 18px;
-    padding: 12px;
-}
+    .stApp { font-family: 'Inter', sans-serif; }
+    .main-title { font-size: 2.2rem; font-weight: 800; text-align: center; margin-bottom: 1rem; }
+    
+    [data-testid="stChatMessage"] {
+        border-radius: 18px;
+        padding: 15px;
+        border: 1px solid rgba(128, 128, 128, 0.1);
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# 🧠 VECTOR DB
+# 🧠 Vektör Veritabanı
 @st.cache_resource
 def load_vector_db():
     embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
@@ -32,157 +36,82 @@ def load_vector_db():
 
 vector_db = load_vector_db()
 
-# 🗂️ Hafıza
+# 🗂️ Sohbet Hafızası
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
 
-# 🔍 AUTOCOMPLETE
-oneriler = [
-    "Devamsızlık sınırı nedir?",
-    "Kaç gün devamsızlıkta kalınır?",
-    "Sınıf geçme şartları nelerdir?",
-    "Kaç dersten kalınca sınıfta kalınır?",
-    "Takdir ve teşekkür şartları nelerdir?",
-    "Sigara içmenin cezası nedir?",
-    "Nakil başvurusu ne zaman yapılır?",
-    "Ders süresi kaç dakikadır?"
-]
-
-def autocomplete(text):
-    if not text:
-        return []
-    return [o for o in oneriler if text.lower() in o.lower()]
-
-# ❌ UYGUNSUZ SORU KONTROL
+# ❌ Güvenlik Filtresi
 def uygunsuz_mu(soru):
-    yasakli = [
-        "küfür","argo","salak","aptal","mal",
-        "siyaset","cumhurbaşkanı","parti",
-        "din","allah","tanrı",
-        "ırk","kürt","türk","arap"
-    ]
-    soru_lower = soru.lower()
-    return any(kelime in soru_lower for kelime in yasakli)
+    yasakli = ["küfür", "argo", "siyaset", "parti", "din", "ırk", "hakaret"]
+    return any(k in soru.lower() for k in yasakli)
 
-# 🤖 MODEL
+# 🤖 Sorgulama Fonksiyonu (Llama 3.3 70B)
 def sorgula(soru):
     docs = vector_db.similarity_search(soru, k=4)
     baglam = "\n\n".join([doc.page_content for doc in docs])
 
     messages = [{
         "role": "system",
-        "content": """
-Sen MEB (Milli Eğitim Bakanlığı) yönetmeliği uzmanısın.
+        "content": """Sen T.C. Milli Eğitim Bakanlığı yönetmelikleri konusunda uzman, ağırbaşlı ve resmi bir asistansın.
+        
+        [KESİN KURALLAR - PDF VERİLERİ]:
+        - Devamsızlık: Özürsüz 10 gün sınır (aşılırsa başarısız sayılır), toplam sınır 30 gündür.
+        - Başarı: Bir dersten başarılı sayılmak için yılsonu puanı en az 50 olmalıdır.
+        - Sınıf Geçme: En fazla 3 dersten başarısız olanlar sorumlu geçer; başarısız ders sayısı 6'yı geçerse sınıf tekrarı yapılır.
+        - Disiplin: Kopya çekmek veya tütün mamulü kullanmak 'Kınama' cezası gerektirir.
+        - Ödüller: Teşekkür (70.00-84.99), Takdir (85.00+).
+        - Kayıt: Evli olanların kaydı yapılmaz; öğrenciyken evlenenler Açık Lise'ye aktarılır.
+        - Süre: Ders saati okulda 40 dakikadır.
 
-GÖREV:
-- Sadece yönetmeliğe göre cevap ver
-- Kısa, net ve resmi ol
-- Maddeler halinde yazabilirsin
-
-YASAK:
-- Küfür, argo, siyaset, din, ırk içeren cevap verme
-- Uydurma bilgi verme
-
-KURALLAR:
-
-GENEL:
-- Ders süresi: 40 dk (okul), 60 dk (işletme)
-
-DEVAMSIZLIK:
-- Özürsüz 10 gün → kalır
-- Toplam 30 gün
-- İstisna 60 gün
-
-SINIF GEÇME:
-- 3 derse kadar sorumlu
-- 6 üstü → sınıf tekrarı
-
-BAŞARI:
-- Geçme notu: 50
-
-DİSİPLİN:
-- Sigara ve kopya = Kınama
-
-BELGE:
-- Teşekkür: 70-84.99
-- Takdir: 85+
-
-NAKİL:
-- Aralık ve Mayıs hariç ay başı
-
-STRATEJİ:
-- Direkt cevabı ver
-- Gereksiz uzatma
-"""
+        TALİMAT: Yanıtlarını resmi bir dille, sadece bu kurallara ve bağlama dayanarak ver."""
     }]
 
     for msg in st.session_state.conversation[-4:]:
         messages.append(msg)
 
-    messages.append({"role": "user", "content": f"{baglam}\n\nSoru: {soru}"})
+    messages.append({"role": "user", "content": f"BAĞLAM:\n{baglam}\n\nSORU: {soru}"})
 
-    completion = client.chat.completions.create(
-        messages=messages,
-        model="gemma2-9b-it",
-        temperature=0.0,
-        max_tokens=800
-    )
+    try:
+        completion = client.chat.completions.create(
+            messages=messages,
+            model="llama-3.3-70b-versatile",
+            temperature=0,
+            max_tokens=800
+        )
+        return completion.choices[0].message.content, docs
+    except Exception as e:
+        return f"⚠️ Bir hata oluştu: {str(e)}", None
 
-    return completion.choices[0].message.content, docs
+# --- ARAYÜZ ---
+st.markdown("<div class='main-title'>🏛️ MEB Mevzuat Uzmanı</div>", unsafe_allow_html=True)
+st.caption("<p style='text-align: center;'>Resmi yönetmelik analiz asistanı</p>", unsafe_allow_html=True)
 
-# 🎯 Başlık
-st.title("🏛️ MEB Mevzuat Asistanı")
-st.caption("Sadece yönetmeliğe uygun cevap verir")
-
-# 💬 Chat geçmişi
+# 💬 Sohbet Geçmişi
 for msg in st.session_state.conversation:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ✍️ Input
-user_input = st.text_input("Sorunuzu yazın:")
-
-# 🔍 Autocomplete
-suggestions = autocomplete(user_input)
-for s in suggestions:
-    if st.button(f"🔎 {s}"):
-        user_input = s
-
-# 💬 Chat input
-chat_input = st.chat_input("Sorunuzu buraya yazın...")
-
-prompt = chat_input if chat_input else user_input
-
-# 🚀 SORGULAMA
-if prompt and prompt.strip() != "":
-
-    # ❌ uygunsuz kontrol
+# ⌨️ Tek Giriş Alanı (Gereksiz tüm prompt/oneri yapıları kaldırıldı)
+if prompt := st.chat_input("Sorunuzu yazın..."):
+    
     if uygunsuz_mu(prompt):
-        hata_mesaji = "❌ Üzgünüm, sorduğunuz konu dışıdır. Lütfen MEB yönetmeliğine göre soru sorunuz."
-        
+        hata = "❌ Üzgünüm, sorunuz yönetmelik kapsamı dışındadır veya uygunsuz içerik barındırmaktadır."
         st.session_state.conversation.append({"role": "user", "content": prompt})
-        st.session_state.conversation.append({"role": "assistant", "content": hata_mesaji})
+        st.session_state.conversation.append({"role": "assistant", "content": hata})
+        st.rerun()
 
-        with st.chat_message("user"):
-            st.markdown(prompt)
-        with st.chat_message("assistant"):
-            st.markdown(hata_mesaji)
+    st.session_state.conversation.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
 
-    else:
-        st.session_state.conversation.append({"role": "user", "content": prompt})
-
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.spinner("Yanıt hazırlanıyor..."):
+    with st.chat_message("assistant"):
+        with st.spinner("⚖️ Mevzuat inceleniyor..."):
             cevap, kaynaklar = sorgula(prompt)
-
+            st.markdown(cevap)
             st.session_state.conversation.append({"role": "assistant", "content": cevap})
-
-            with st.chat_message("assistant"):
-                st.markdown(cevap)
-
-                if kaynaklar:
-                    with st.expander("📄 Kaynaklar"):
-                        for doc in kaynaklar:
-                            st.caption(doc.page_content[:300] + "...")
+            
+            if kaynaklar:
+                with st.expander("📄 İlgili Madde Referansları"):
+                    for doc in kaynaklar:
+                        st.caption(doc.page_content[:400] + "...")
+                        st.divider()
