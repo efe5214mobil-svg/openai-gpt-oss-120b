@@ -8,19 +8,19 @@ import re
 
 # 🔐 API ve Çevre Değişkenleri
 load_dotenv()
-api_key = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
-client = Groq(api_key=api_key)
+api_anahtari = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
+istemci = Groq(api_key=api_anahtari)
 
 # 🎨 Sayfa Yapılandırması
 st.set_page_config(page_title="MEB Mevzuat Asistanı", page_icon="🏛️", layout="centered")
 
-# 🖌️ Modern CSS
+# 🖌️ Modern Görünüm (CSS)
 st.markdown("""
 <style>
     .stApp { font-family: 'Inter', sans-serif; }
-    .main-title { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 1.5rem; color: #FFFFFF; }
+    .ana-baslik { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 1.5rem; color: #FFFFFF; }
     
-    .floating-button-container {
+    .yuzen-buton-alani {
         position: fixed;
         bottom: 85px; 
         right: 10%; 
@@ -38,7 +38,7 @@ st.markdown("""
         box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
     }
 
-    .category-box {
+    .kategori-kutusu {
         background-color: rgba(128, 128, 128, 0.05);
         border-radius: 15px;
         padding: 18px;
@@ -46,113 +46,108 @@ st.markdown("""
         height: 100%;
         margin-bottom: 10px;
     }
-    .category-title { font-weight: bold; color: #FF4B4B; margin-bottom: 10px; font-size: 1.15rem; }
-    .category-item { font-size: 0.88rem; margin-bottom: 6px; color: #444; }
+    .kategori-basligi { font-weight: bold; color: #FF4B4B; margin-bottom: 10px; font-size: 1.15rem; }
+    .kategori-maddesi { font-size: 0.88rem; margin-bottom: 6px; color: #444; }
 </style>
 """, unsafe_allow_html=True)
 
-# 🧠 Vektör Veritabanı
+# 🧠 Veri Tabanı Yükleme
 @st.cache_resource
-def load_vector_db():
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    return Chroma(persist_directory="okul_asistani_gpt_db", embedding_function=embeddings)
+def veri_tabanini_yukle():
+    gomme_modeli = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    return Chroma(persist_directory="okul_asistani_gpt_db", embedding_function=gomme_modeli)
 
-vector_db = load_vector_db()
+vektor_tabani = veri_tabanini_yukle()
 
-# 🛡️ GELİŞMİŞ GÜVENLİK FİLTRESİ (Zırhlı Versiyon)
-def filtre_kontrol(metin):
-    # Benzer karakterleri dönüştür (leetspeak koruması)
-    donusumler = {
+# 🛡️ GELİŞMİŞ GÜVENLİK SÜZGECİ
+def suzgec_kontrolu(metin):
+    # Benzer karakterleri harfe dönüştür
+    karakter_haritasi = {
         '1': 'i', '0': 'o', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b', 
-        '@': 'a', '$': 's', '€': 'e', '!': 'i', '0': 'o'
+        '@': 'a', '$': 's', '€': 'e', '!': 'i'
     }
     
-    # 1. Küçük harfe çevir
-    temiz = metin.lower()
+    # 1. Metni küçült
+    temiz_metin = metin.lower()
     
-    # 2. Benzer karakterleri harfe çevir
-    for eski, yeni in donusumler.items():
-        temiz = temiz.replace(eski, yeni)
+    # 2. Benzer karakterleri değiştir
+    for eski, yeni in karakter_haritasi.items():
+        temiz_metin = temiz_metin.replace(eski, yeni)
     
-    # 3. Harf ve rakam dışındaki TÜM sembolleri sil (Nokta, alt tire, boşluk dahil)
-    # Bu sayede "a.m.k" veya "g_a_y" direkt "amk" ve "gay" olur.
-    temiz = re.sub(r'[^a-z0-9]', '', temiz)
+    # 3. Harf ve rakam dışındaki her şeyi sil (boşluk, nokta, sembol)
+    temiz_metin = re.sub(r'[^a-z0-9]', '', temiz_metin)
     
-    yasakli_listesi = [
-        # Küfür & Kısaltma
+    yasakli_kelimeler = [
         "oc", "aq", "amk", "amq", "pic", "got", "sik", "amc", "yarrak", "fassak", "tassak", "dassak",
-        "orospu", "fahise", "pezevenk", "kahpe", "gavat", "meme",
-        # Cinsel Yönelim & Taciz
-        "gay", "lezbiyen", "lgbt", "travesti", "seks", "sex", "porno", "vajina", "penis",
-        # Hakaret & Siyaset/Din
-        "siyaset", "parti", "teror", "it", "kopek", "serefsiz", "haysiyetsiz", "beyinsiz", "gerizekali"
+        "orospu", "fahise", "pezevenk", "kahpe", "gavat", "meme", "gay", "lezbiyen", "lgbt", 
+        "travesti", "seks", "sex", "porno", "vajina", "penis", "siyaset", "parti", "teror", 
+        "it", "kopek", "serefsiz", "haysiyetsiz", "beyinsiz", "gerizekali"
     ]
     
-    return any(yasak in temiz for yasak in yasakli_listesi)
+    return any(yasakli in temiz_metin for yasakli in yasakli_kelimeler)
 
-if "conversation" not in st.session_state:
-    st.session_state.conversation = []
+if "sohbet_gecmisi" not in st.session_state:
+    st.session_state.sohbet_gecmisi = []
 
-# 🤖 Sorgulama Fonksiyonu
-def sorgula(soru):
-    docs = vector_db.similarity_search(soru, k=5)
-    baglam = "\n\n".join([doc.page_content for doc in docs])
+# 🤖 Yanıt Oluşturucu
+def cevap_olustur(soru):
+    ilgili_belgeler = vektor_tabani.similarity_search(soru, k=5)
+    kaynak_metin = "\n\n".join([belge.page_content for belge in ilgili_belgeler])
     
-    messages = [{
+    iletiler = [{
         "role": "system", 
         "content": """Sen uzman bir MEB Mevzuat Asistanısın. 
         GÖREVİN: Sadece Milli Eğitim Bakanlığı yönetmelikleri hakkında bilgi vermek.
-        KESİN YASAK: Küfür, hakaret, cinsel içerik veya yönelimlerle ilgili tartışmalara asla girme.
-        BİLGİLER: Ders süresi 40/60dk, Devamsızlık 10/30 gün, Geçme 50, Sorumluluk max 3, 6+ zayıf tekrar."""
+        ÖNEMLİ: Cevaplarında yabancı kelime kullanma, tamamen Türkçe ifadeler seç.
+        KURALLAR: Ders süresi 40/60dk, Devamsızlık 10/30 gün, Geçme 50, Sorumluluk en fazla 3, 6+ zayıf tekrar."""
     }]
     
-    for msg in st.session_state.conversation[-4:]:
-        messages.append(msg)
+    for ileti in st.session_state.sohbet_gecmisi[-4:]:
+        iletiler.append(ileti)
     
-    messages.append({"role": "user", "content": f"BAĞLAM:\n{baglam}\n\nKULLANICI SORUSU: {soru}"})
+    iletiler.append({"role": "user", "content": f"KAYNAK VERİLER:\n{kaynak_metin}\n\nKULLANICI SORUSU: {soru}"})
     
-    completion = client.chat.completions.create(
-        messages=messages, 
+    yanit = istemci.chat.completions.create(
+        messages=iletiler, 
         model="llama-3.3-70b-versatile", 
         temperature=0.1
     )
-    return completion.choices[0].message.content
+    return yanit.choices[0].message.content
 
 # --- ARAYÜZ ---
-st.markdown("<div class='main-title'>🏛️ MEB Yönetmelik Asistanı</div>", unsafe_allow_html=True)
+st.markdown("<div class='ana-baslik'>🏛️ MEB Yönetmelik Asistanı</div>", unsafe_allow_html=True)
 
-st.markdown('<div class="floating-button-container">', unsafe_allow_html=True)
+st.markdown('<div class="yuzen-buton-alani">', unsafe_allow_html=True)
 st.link_button("📅 Sınıf Programı", "https://sinifprogrami.streamlit.app/")
 st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("### 💡 Hızlı Sorular")
-c1, c2, c3 = st.columns(3)
-with c1:
-    st.markdown('<div class="category-box"><div class="category-title">📜 Kayıt & Disiplin</div><div class="category-item">• Evlilik durumu ne olur?<br>• Yaş sınırı kaç?</div></div>', unsafe_allow_html=True)
-with c2:
-    st.markdown('<div class="category-box"><div class="category-title">⏳ Devamsızlık</div><div class="category-item">• 30 gün kuralı nedir?<br>• Özürsüz kaç gün?</div></div>', unsafe_allow_html=True)
-with c3:
-    st.markdown('<div class="category-box"><div class="category-title">🎓 Başarı & Nakil</div><div class="category-item">• Kaç zayıfla kalınır?<br>• Nakil dönemi ne zaman?</div></div>', unsafe_allow_html=True)
+sutun1, sutun2, sutun3 = st.columns(3)
+with sutun1:
+    st.markdown('<div class="kategori-kutusu"><div class="kategori-basligi">📜 Kayıt & Disiplin</div><div class="kategori-maddesi">• Evlilik durumu ne olur?<br>• Yaş sınırı kaç?</div></div>', unsafe_allow_html=True)
+with sutun2:
+    st.markdown('<div class="kategori-kutusu"><div class="kategori-basligi">⏳ Devamsızlık</div><div class="kategori-maddesi">• 30 gün kuralı nedir?<br>• Özürsüz kaç gün?</div></div>', unsafe_allow_html=True)
+with sutun3:
+    st.markdown('<div class="kategori-kutusu"><div class="kategori-basligi">🎓 Başarı & Nakil</div><div class="kategori-maddesi">• Kaç zayıfla kalınır?<br>• Nakil dönemi ne zaman?</div></div>', unsafe_allow_html=True)
 st.markdown("---")
 
-# Sohbet Geçmişi
-for msg in st.session_state.conversation:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Geçmişi Ekrana Yaz
+for ileti in st.session_state.sohbet_gecmisi:
+    with st.chat_message(ileti["role"]):
+        st.markdown(ileti["content"])
 
-# Giriş Alanı
-if prompt := st.chat_input("Yönetmelik hakkında bir soru sorun..."):
+# Kullanıcı Girişi
+if girdi := st.chat_input("Yönetmelik hakkında bir soru sorun..."):
     
-    # 🛡️ SÜPER FİLTRE KONTROLÜ
-    if filtre_kontrol(prompt):
-        st.error("⚠️ Mesajınız topluluk kurallarına aykırı veya uygunsuz içerik barındırdığı için sistem tarafından engellenmiştir.")
+    if suzgec_kontrolu(girdi):
+        st.error("⚠️ Uyarı: İletiniz topluluk kurallarına aykırı veya uygunsuz içerik barındırdığı için engellenmiştir.")
     else:
-        st.session_state.conversation.append({"role": "user", "content": prompt})
+        st.session_state.sohbet_gecmisi.append({"role": "user", "content": girdi})
         with st.chat_message("user"):
-            st.markdown(prompt)
+            st.markdown(girdi)
 
         with st.chat_message("assistant"):
             with st.spinner("⚖️ İnceleniyor..."):
-                cevap = sorgula(prompt)
+                cevap = cevap_olustur(girdi)
                 st.markdown(cevap)
-                st.session_state.conversation.append({"role": "assistant", "content": cevap})
+                st.session_state.sohbet_gecmisi.append({"role": "assistant", "content": cevap})
