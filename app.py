@@ -69,38 +69,31 @@ if "conversation" not in st.session_state:
 
 # 🤖 Sorgulama Fonksiyonu
 def sorgula(soru):
-    if filtre_kontrol(soru):
-        return "⚠️ Uyarı: Mesajınız topluluk kurallarına aykırı içerik barındırıyor. Lütfen sadece MEB yönetmeliğiyle ilgili sorular sorun."
-
-    # Mevzuatı derinden tara
     docs = vector_db.similarity_search(soru, k=5)
     baglam = "\n\n".join([doc.page_content for doc in docs])
     
     messages = [{
         "role": "system", 
-        "content": """Sen uzman bir MEB Mevzuat Asistanısın. 
-        
-        KESİN KURALLAR:
-        - DEVAMSIZLIK: Özürsüz 10 gün, toplam (özürlü+özürsüz) 30 gün sınırı vardır. Bu sınırları 1 saat bile aşan öğrenci sınıf tekrarına kalır.
-        - YAŞ: Kayıt günü itibarıyla 18 yaşını bitirmemiş olmak gerekir.
-        - EVLİLİK: Evli olanların kaydı yapılmaz; öğrenciyken evlenenlerin kaydı Açık Lise'ye aktarılır.
-        - BAŞARI: Ders geçme notu 50'dir. Sorumlu geçme sınırı en fazla 3 derstir. Toplam 6 dersten kalan sınıf tekrarı yapar.
-        - SINAVLAR: Her dersten en az 2 yazılı. Beceri sınavlarında %80 sınav, %20 iş dosyası etkilidir.
-        - DİSİPLİN: Kopya çekmek veya sigara kullanmak doğrudan "Kınama" cezasıdır.
-        - ÖDÜLLER: Teşekkür (70.00-84.99), Takdir (85.00+).
-        - DERS SÜRESİ: Okulda 40, işletmede 60 dakikadır.
+        "content": """Sen uzman bir MEB Mevzuat Asistanısın. Aşağıdaki güncel kurallara tam bağlı kalarak, profesyonel ama anlaşılır bir dille cevap ver:
 
-        TALİMATLAR:
-        - Asla 'Tablo', 'Madde x' veya 'Dökümana göre' gibi ifadeler kullanma.
-        - Cevabı bir uzman gibi akıcı ve doğrudan ver.
-        - Selamlaşmalara nazikçe cevap ver.
-        - Cevaplarını döküman içeriğine dayandır ama teknik referans gösterme."""
+        [TEMEL KURALLAR]:
+        - Ders Süresi: Okulda 40 dk, işletmelerde 60 dk.
+        - Kayıt & Yaş: Kayıt günü 18 yaşını bitirmemiş olmak şart. Evli olanlar kaydedilmez, öğrenciyken evlenenler Açık Lise'ye nakledilir.
+        - Devamsızlık: Özürsüz sınırı 10 gün. Toplam (özürlü+özürsüz) sınırı 30 gün. İstisnai hallerde (organ nakli, ağır hastalık vb.) toplam 60 gün.
+        - Geç Gelme: Sadece 1. ders için geçerlidir, sonrası devamsızlık sayılır.
+        - Başarı & Sınıf Geçme: Geçme notu 50. Her dersten en az 2 yazılı zorunlu. Max 3 ders zayıfı olan 'Sorumlu' geçer. Toplam 6+ zayıfı olan sınıf tekrarı yapar.
+        - Beceri Sınavı: %80 sınav puanı + %20 iş dosyası.
+        - Nakil: Aralık ve Mayıs ayları hariç her ayın ilk iş günü başvurulabilir.
+        - Disiplin: Kopya ve sigara kullanımı 'Kınama' cezasıdır.
+        - Ödüller: Teşekkür (70.00-84.99), Takdir (85.00+).
+
+        Talimat: Teknik referans (madde no vb.) verme, doğrudan cevap ver. Dökümanlardaki (BAĞLAM) bilgilerle yukarıdaki kuralları harmanla."""
     }]
     
     for msg in st.session_state.conversation[-4:]:
         messages.append(msg)
     
-    messages.append({"role": "user", "content": f"MEVZUAT KAYNAKLARI:\n{baglam}\n\nKULLANICI SORUSU: {soru}"})
+    messages.append({"role": "user", "content": f"BAĞLAM:\n{baglam}\n\nKULLANICI SORUSU: {soru}"})
     
     completion = client.chat.completions.create(
         messages=messages, 
@@ -110,37 +103,37 @@ def sorgula(soru):
     return completion.choices[0].message.content
 
 # --- ARAYÜZ ---
-st.markdown("<div class='main-title'>🏛️ MEB Mevzuat Uzmanı</div>", unsafe_allow_html=True)
+st.markdown("<div class='main-title'>🏛️ MEB Yönetmelik Asistanı</div>", unsafe_allow_html=True)
 
-# 📅 Sınıf Programı Butonu
 st.markdown('<div class="floating-button-container">', unsafe_allow_html=True)
 st.link_button("📅 Sınıf Programı", "https://sinifprogrami.streamlit.app/")
 st.markdown('</div>', unsafe_allow_html=True)
 
-# 💡 Sabit Öneri Kartları
 st.markdown("### 💡 Hızlı Sorular")
 c1, c2, c3 = st.columns(3)
 with c1:
-    st.markdown('<div class="category-box"><div class="category-title">📜 Kayıt & Disiplin</div><div class="category-item">• Evlilik durumu ne olur?<br>• Kopya cezası nedir?</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="category-box"><div class="category-title">📜 Kayıt & Disiplin</div><div class="category-item">• Evlilik durumu ne olur?<br>• Yaş sınırı kaç?</div></div>', unsafe_allow_html=True)
 with c2:
-    st.markdown('<div class="category-box"><div class="category-title">⏳ Devamsızlık</div><div class="category-item">• 30 gün kuralı nedir?<br>• Özürsüz kaç gün?</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="category-box"><div class="category-title">⏳ Devamsızlık</div><div class="category-item">• 30 gün kuralı nedir?<br>• Geç gelme durumu?</div></div>', unsafe_allow_html=True)
 with c3:
     st.markdown('<div class="category-box"><div class="category-title">🎓 Başarı & Nakil</div><div class="category-item">• Kaç zayıfla kalınır?<br>• Nakil dönemi ne zaman?</div></div>', unsafe_allow_html=True)
 st.markdown("---")
 
-# Sohbet Geçmişini Görüntüle
 for msg in st.session_state.conversation:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Giriş Alanı
 if prompt := st.chat_input("Yönetmelik hakkında bir soru sorun..."):
-    st.session_state.conversation.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    
+    if filtre_kontrol(prompt):
+        st.warning("⚠️ Uyarı: Mesajınız topluluk kurallarına aykırı içerik (küfür, siyaset, din vb.) barındırdığı için engellenmiştir. Lütfen sadece yönetmelik ile ilgili sorular sorun.")
+    else:
+        st.session_state.conversation.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
 
-    with st.chat_message("assistant"):
-        with st.spinner("⚖️ Mevzuat inceleniyor..."):
-            cevap = sorgula(prompt)
-            st.markdown(cevap)
-            st.session_state.conversation.append({"role": "assistant", "content": cevap})
+        with st.chat_message("assistant"):
+            with st.spinner("⚖️ İçerik inceleniyor..."):
+                cevap = sorgula(prompt)
+                st.markdown(cevap)
+                st.session_state.conversation.append({"role": "assistant", "content": cevap})
