@@ -18,7 +18,7 @@ st.set_page_config(page_title="MEB Mevzuat Asistanı", page_icon="🏛️", layo
 st.markdown("""
 <style>
     .stApp { font-family: 'Inter', sans-serif; }
-    .main-title { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 1.5rem; color: #1E1E1E; }
+    .main-title { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 1.5rem; color: #FFFFFF; }
     
     .floating-button-container {
         position: fixed;
