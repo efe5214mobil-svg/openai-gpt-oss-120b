@@ -47,6 +47,22 @@ st.markdown("""
         height: 100%;
         margin-bottom: 10px;
     }
+    .kategori-kutusu2 {
+        background-color: rgba(128, 128, 128, 0.05);
+        border-radius: 15px;
+        padding: 18px;
+        border-top: 4px solid  #0974e6;
+        height: 100%;
+        margin-bottom: 10px;
+    }
+    .kategori-kutusu3 {
+        background-color: rgba(128, 128, 128, 0.05);
+        border-radius: 15px;
+        padding: 18px;
+        border-top: 4px solid #05f250;
+        height: 100%;
+        margin-bottom: 10px;
+    }
     .kategori-basligi { font-weight: bold; color: #FF4B4B; margin-bottom: 10px; font-size: 1.15rem; }
     .kategori-basligi2 { font-weight: bold; color: #0974e6; margin-bottom: 10px; font-size: 1.15rem; }
     .kategori-basligi3 { font-weight: bold; color: #05f250; margin-bottom: 10px; font-size: 1.15rem; }
