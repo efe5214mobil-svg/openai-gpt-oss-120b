@@ -13,7 +13,7 @@ api_anahtari = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
 istemci = Groq(api_key=api_anahtari)
 
 # 🎨 Sayfa Yapılandırması
-st.set_page_config(page_title="MEB Mevzuat Asistanı", page_icon="🏛️", layout="centered")
+st.set_page_config(page_title="MEB Yönetmelik Asistanı", page_icon="🏫", layout="centered")
 
 # 🖌️ Modern Görünüm (CSS)
 st.markdown("""
