@@ -9,7 +9,7 @@ import time
 st.set_page_config(page_title="MEB Yönetmelik Asistanı", page_icon="🏫", layout="centered")
 
 # --- 📁 KALICI ANAHTAR YÖNETİMİ ---
-KEY_FILE = ".groq_key" # Anahtarın saklanacağı gizli dosya
+KEY_FILE = ".env" # Anahtarın saklanacağı gizli dosya
 
 def anahtari_kaydet(anahtar):
     with open(KEY_FILE, "w") as f:
