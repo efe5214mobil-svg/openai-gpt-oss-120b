@@ -2,39 +2,133 @@ import streamlit as st
 from groq import Groq
 from langchain_community.vectorstores import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings 
-from dotenv import load_dotenv
 import os
-import re
 import time 
-
-# 🔐 API ve Çevre Değişkenleri
-load_dotenv()
-api_anahtari = os.getenv("GROQ_API_KEY") or st.secrets.get("GROQ_API_KEY")
-istemci = Groq(api_key=api_anahtari)
 
 # 🎨 Sayfa Yapılandırması
 st.set_page_config(page_title="MEB Yönetmelik Asistanı", page_icon="🏫", layout="centered")
+
+# --- 📁 KALICI ANAHTAR YÖNETİMİ ---
+KEY_FILE = ".groq_key" # Anahtarın saklanacağı gizli dosya
+
+def anahtari_kaydet(anahtar):
+    with open(KEY_FILE, "w") as f:
+        f.write(anahtar)
+
+def anahtari_oku():
+    if os.path.exists(KEY_FILE):
+        with open(KEY_FILE, "r") as f:
+            return f.read().strip()
+    return None
+
+# --- 🔐 API ANAHTARI DOĞRULAMA ---
+def api_anahtari_gecerli_mi(anahtar):
+    if not anahtar: return False
+    try:
+        test_istemci = Groq(api_key=anahtar)
+        test_istemci.chat.completions.create(
+            messages=[{"role": "user", "content": "hi"}],
+            model="llama3-8b-8192",
+            max_tokens=1
+        )
+        return True
+    except Exception:
+        return False
+
+# --- 🛡️ GİRİŞ KONTROLÜ ---
+kayitli_anahtar = anahtari_oku()
+
+# Eğer dosya yoksa veya dosyadaki anahtar geçersizse giriş ekranını göster
+if not api_anahtari_gecerli_mi(kayitli_anahtar):
+    st.markdown("<h1 style='text-align: center;'>🏫 MEB Yönetmelik Asistanı</h1>", unsafe_allow_html=True)
+    st.info("Sistemi ilk kez çalıştırıyorsunuz veya anahtarınız geçersiz. Lütfen geçerli bir Groq API Key giriniz.")
+    
+    input_key = st.text_input("Groq API Key:", type="password")
+    if st.button("Sistemi Kur ve Başlat"):
+        if api_anahtari_gecerli_mi(input_key):
+            anahtari_kaydet(input_key) # Anahtarı dosyaya yaz (Kalcı hale getir)
+            st.success("Anahtar doğrulandı ve kaydedildi! Başlatılıyor...")
+            time.sleep(1)
+            st.rerun()
+        else:
+            st.error("❌ Hatalı API Anahtarı! Lütfen kontrol edin.")
+    st.stop()
+
+# --- 🚀 UYGULAMA ANA GÖVDESİ ---
+# Buraya gelindiyse anahtar dosyada vardır ve doğrudur
+istemci = Groq(api_key=anahtari_oku())
 
 # 🖌️ Modern Görünüm (CSS)
 st.markdown("""
 <style>
     .stApp { font-family: 'Inter', sans-serif; }
     .ana-baslik { font-size: 2.5rem; font-weight: 800; text-align: center; margin-bottom: 1.5rem; color: #FFFFFF; }
-    .stLinkButton a {
-        background-color: #FF8C00 !important;
-        color: white !important;
-        border-radius: 25px !important;
-        padding: 0.6rem 1.5rem !important;
-        font-weight: 700 !important;
-        text-decoration: none !important;
-        border: 2px solid white !important;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
-    }
-
-    .kategori-kutusu {
+    .kategori-kutusu, .kategori-kutusu2, .kategori-kutusu3 {
         background-color: rgba(128,128,128, 0.05);
-        border-radius: 15px;
-        padding: 18px;
+        border-radius: 15px; padding: 18px; margin-bottom: 10px; height: 100%;
+    }
+    .kategori-kutusu { border-top: 4px solid #FF4B4B; }
+    .kategori-kutusu2 { border-top: 4px solid #0974e6; }
+    .kategori-kutusu3 { border-top: 4px solid #05f250; }
+</style>
+""", unsafe_allow_html=True)
+
+# 🧠 Veri Tabanı Yükleme
+@st.cache_resource
+def veri_tabanini_yukle():
+    gomme_modeli = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+    return Chroma(persist_directory="okul_asistani_gpt_db", embedding_function=gomme_modeli)
+
+vektor_tabani = veri_tabanini_yukle()
+
+# --- ARAYÜZ ---
+st.markdown("<div class='ana-baslik'>🏛️ MEB Yönetmelik Asistanı</div>", unsafe_allow_html=True)
+
+if "sohbet_gecmisi" not in st.session_state:
+    st.session_state.sohbet_gecmisi = []
+
+# Hızlı Bilgi Kutuları
+c1, c2, c3 = st.columns(3)
+with c1: st.markdown('<div class="kategori-kutusu"><b>📜 Mevzuat</b><br>Kayıt ve Kabul</div>', unsafe_allow_html=True)
+with c2: st.markdown('<div class="kategori-kutusu2"><b>⏳ Devamsızlık</b><br>10/30 Gün Sınırı</div>', unsafe_allow_html=True)
+with c3: st.markdown('<div class="kategori-kutusu3"><b>🎓 Sınıf Geçme</b><br>Zayıf Sayısı</div>', unsafe_allow_html=True)
+
+# Sohbet Alanı
+for ileti in st.session_state.sohbet_gecmisi:
+    with st.chat_message(ileti["role"]):
+        st.markdown(ileti["content"])
+
+if girdi := st.chat_input("Yönetmelik sorunuzu yazın..."):
+    st.session_state.sohbet_gecmisi.append({"role": "user", "content": girdi})
+    with st.chat_message("user"):
+        st.markdown(girdi)
+
+    with st.chat_message("assistant"):
+        with st.spinner("⚖️ İnceleniyor..."):
+            # RAG İşlemi (Similarity Search)
+            ilgili_belgeler = vektor_tabani.similarity_search(girdi, k=4)
+            kaynak = "\n".join([b.page_content for b in ilgili_belgeler])
+            
+            yanit = istemci.chat.completions.create(
+                messages=[
+                    {"role": "system", "content": "Sen bir MEB Mevzuat asistanısın. Sadece yönetmeliklere uygun cevap ver."},
+                    {"role": "user", "content": f"Bağlam: {kaynak}\nSoru: {girdi}"}
+                ],
+                model="llama-3.3-70b-versatile"
+            )
+            cevap = yanit.choices[0].message.content
+            st.markdown(cevap)
+            st.session_state.sohbet_gecmisi.append({"role": "assistant", "content": cevap})
+            st.rerun()
+
+# Sidebar - Ayarları Sıfırlama
+with st.sidebar:
+    st.write("### 🛠️ Ayarlar")
+    if st.button("Sistemi Sıfırla (Anahtarı Sil)"):
+        if os.path.exists(KEY_FILE):
+            os.remove(KEY_FILE)
+        st.session_state.clear()
+        st.rerun()        padding: 18px;
         border-top: 4px solid #FF4B4B;
         height: 100%;
         margin-bottom: 10px;
