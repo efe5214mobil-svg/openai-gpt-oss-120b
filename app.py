@@ -34,22 +34,7 @@ def veri_tabanini_yukle():
     gomme_modeli = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
     return Chroma(persist_directory="okul_asistani_gpt_db", embedding_function=gomme_modeli)
 
-def suzgec_kontrolu(metin):
-    karakter_haritasi = {'1': 'i', '0': 'o', '3': 'e', '4': 'a', '5': 's', '7': 't', '8': 'b', '@': 'a', '$': 's'}
-    temiz_metin = metin.lower()
-    for eski, yeni in karakter_haritasi.items():
-        temiz_metin = temiz_metin.replace(eski, yeni)
-    
-    sikistirilmis_metin = re.sub(r'[^a-z0-9çşğüöı]', '', temiz_metin)
-    yasakli_kelimeler = [
-        "oc", "aq", "amk", "amq", "pic", "got", "sik", "amc", "yarrak", "orospu", "bebegim", "askim",
-        "nigga", "zenci", "cikolata", "irkci", "yahudi", "ermeni", "nazi",
-        "erdogan", "tayyip", "rte", "cumhurbaskani", "akp", "chp", "mhp", "siyaset", "parti", "darbe",
-        "mahmud", "charles", "suleyman", "fatih", "kanuni", "padisah", "kral", "imparator", "osmanli",
-        "ataturk", "hitler", "stalin", "lenin", "modernizm", "narsizm", "narsist", "nihilizm", 
-        "ideoloji", "1945", "1939", "savas", "gay", "lezbiyen", "lgbt", "seks", "porno"
-    ]
-    return any(yasakli in sikistirilmis_metin for yasakli in yasakli_kelimeler)
+
 
 def cevap_olustur(soru, vektor_db, istemci):
     ilgili_belgeler = vektor_db.similarity_search(soru, k=5)
@@ -71,6 +56,8 @@ def cevap_olustur(soru, vektor_db, istemci):
     13. Kopya çektiği tespit edilirse öğrencinin Sınav kağıdına (K) yazılır ve puanı sıfır (0) kabul edilir.
     14. Başka bir okula nakil olmak istiyorsa başvuruyu ne zaman yapılır sorusuna Aralık ve Mayıs ayları hariç olmak üzere, her ayın ilk iş gününden son iş gününe kadar başvurulabilir.
     15. Lise öğrencisiyken evlenen bir öğrencinin kaydı devam eder mi? sorusuna Hayır. Evli olanların kayıtları yapılmaz, öğrenciyken evlenenlerin okulla ilişkisi kesilerek Açık Öğretim Lisesine yönlendirilir.  olarak cevapla.
+    16. Eğer kişi yönetmelik alakalı  soru soruyorsa Okul eşyalarına kasten zarar vermenin disiplin yönetmeliğindeki karşılığı nedir? bu soruyu soruyorsa mesaj içeriğini engelleme.
+    17. 
     Siyaset ve uygunsuz konulara girme."""
 
     iletiler = [{"role": "system", "content": sistem_mesaji}]
@@ -119,9 +106,9 @@ s1, s2, s3 = st.columns(3)
 with s1:
     st.markdown('<div class="kategori-kutusu"><div class="kategori-basligi">📜 Kayıt & Disiplin</div><div class="kategori-maddesi">• Disiplin cezaları nelerdir?<br>• Kopya cezası?</div></div>', unsafe_allow_html=True)
 with s2:
-    st.markdown('<div class="kategori-kutusu2"><div class="kategori-basligi2">⏳ Devamsızlık</div><div class="kategori-maddesi">• 10/30 gün kuralı?<br>• Geç gelme sınırı? <br> • Onur Belgesi alabilmek için gerekli şartlar nelerdir?</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="kategori-kutusu2"><div class="kategori-basligi2">⏳ Devamsızlık</div><div class="kategori-maddesi">• 10/30 gün kuralı?<br>• Geç gelme sınırı?</div></div>', unsafe_allow_html=True)
 with s3:
-    st.markdown('<div class="kategori-kutusu3"><div class="kategori-basligi3">🎓 Başarı & Nakil</div><div class="kategori-maddesi">• Kaç zayıfla kalınır?<br>• Nakil dönemi?</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="kategori-kutusu3"><div class="kategori-basligi3">🎓 Başarı & Nakil</div><div class="kategori-maddesi">• Kaç zayıfla kalınır?<br>• Nakil dönemi? <br> • Onur Belgesi alabilmek için gerekli şartlar nelerdir?</div></div>', unsafe_allow_html=True)
 st.markdown("---")
 
 # Sohbet Geçmişini Görüntüle
@@ -131,9 +118,6 @@ for ileti in st.session_state.sohbet_gecmisi:
 
 # Kullanıcı Girişi
 if girdi := st.chat_input("Yönetmelik hakkında bir soru sorun..."):
-    if suzgec_kontrolu(girdi):
-        st.error("⚠️ Uyarı: İletiniz uygunsuz içerik barındırdığı için engellenmiştir.")
-    else:
         st.session_state.sohbet_gecmisi.append({"role": "user", "content": girdi})
         with st.chat_message("user"):
             st.markdown(girdi)
